@@ -1,4 +1,4 @@
-[Video Explicación](https://youtu.be/w692Lt8kn4E)
+[VIDEO EXPLICACIÓN / VIDEO GUIDE](https://youtu.be/82bdJtAa9BQ)
 
 # DHCP Server y Cliente Implementación
 
