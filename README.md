@@ -5,6 +5,8 @@ Here’s the updated `README.md` with instructions on how to use the DHCP server
 ## Introducción
 Este proyecto implementa un servidor y un cliente DHCP utilizando el lenguaje de programación C. El servidor es capaz de escuchar solicitudes de dirección IP de clientes en una red local o remota y asignar direcciones IP de manera dinámica. El cliente, por su parte, envía solicitudes de dirección IP y maneja la renovación y liberación de la dirección IP asignada.
 
+![UML](https://github.com/user-attachments/assets/309ca7ce-9819-4915-9dab-7ad29ad0624a)
+
 ## Desarrollo
 ### Tecnologías Utilizadas
 - Lenguaje: C
