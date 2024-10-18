@@ -39,10 +39,10 @@ Este proyecto implementa un servidor y un cliente DHCP utilizando el lenguaje de
 - El servidor puede asignar direcciones IP de manera dinámica y registrar estas asignaciones.
 - El cliente puede solicitar una dirección IP y manejar la renovación.
 - Se logró el manejo concurrente de solicitudes mediante hilos.
+- Manejo de errores más sofisticado para condiciones especiales, como la falta de direcciones IP disponibles.
 
 ### Aspectos No logrados
 - Implementación de un DHCP relay para manejar clientes en diferentes subredes.
-- Manejo de errores más sofisticado para condiciones especiales, como la falta de direcciones IP disponibles.
 
 ## Conclusiones
 Este proyecto demuestra la capacidad de implementar un servicio básico de asignación de IP utilizando el protocolo DHCP. Aunque se lograron varias funcionalidades clave, hay áreas para mejoras futuras, como la integración de un DHCP relay y un manejo de errores más robusto. Esta implementación puede servir como base para un sistema más complejo y completo en el futuro.
@@ -130,10 +130,10 @@ This project implements a DHCP server and client using the C programming languag
 - The server can dynamically assign IP addresses and log these assignments.
 - The client can request an IP address and handle renewal.
 - Achieved concurrent handling of requests using threads.
+- More sophisticated error handling for special conditions, such as lack of available IP addresses.
 
 ### Limitations
 - Implementation of a DHCP relay to handle clients on different subnets.
-- More sophisticated error handling for special conditions, such as lack of available IP addresses.
 
 ## Conclusions
 This project demonstrates the capability to implement a basic IP allocation service using the DHCP protocol. While several key functionalities were achieved, there are areas for future improvements, such as integrating a DHCP relay and more robust error handling. This implementation can serve as a foundation for a more complex and complete system in the future.
