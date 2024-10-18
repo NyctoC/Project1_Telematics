@@ -5,13 +5,13 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#define DHCP_SERVER_IP "10.0.2.5"
+#define DHCP_SERVER_IP "18.224.136.204"
 #define DHCP_SERVER_PORT 67
 #define DHCP_CLIENT_PORT 68
 #define BUFFER_SIZE 1024
 #define LEASE_TIME 3600 // 1 hour
-#define MAX_RETRIES 5 // Maximum number of retries
-#define RETRY_INTERVAL 2 // Interval between retries in seconds
+#define MAX_RETRIES 5
+#define RETRY_INTERVAL 2 
 
 void request_renewal(int sock, struct sockaddr_in *server_addr) {
     char dhcp_request[BUFFER_SIZE] = "DHCPREQUEST";
@@ -90,9 +90,9 @@ int main() {
     // Send DHCPREQUEST to request the offered IP
     request_renewal(sock, &server_addr);
 
-    // Example renewal loop
+    // renewal loop
     while (1) {
-        sleep(LEASE_TIME / 2); // Example: request renewal halfway through the lease time
+        sleep(LEASE_TIME / 2);
         request_renewal(sock, &server_addr);
     }
 
