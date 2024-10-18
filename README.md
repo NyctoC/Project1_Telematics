@@ -1,3 +1,5 @@
+Here’s the updated `README.md` with instructions on how to use the DHCP server and client, added at the end of the document:
+
 # DHCP Server y Cliente Implementación
 
 ## Introducción
@@ -44,6 +46,38 @@ Este proyecto implementa un servidor y un cliente DHCP utilizando el lenguaje de
 
 ## Conclusiones
 Este proyecto demuestra la capacidad de implementar un servicio básico de asignación de IP utilizando el protocolo DHCP. Aunque se lograron varias funcionalidades clave, hay áreas para mejoras futuras, como la integración de un DHCP relay y un manejo de errores más robusto. Esta implementación puede servir como base para un sistema más complejo y completo en el futuro.
+
+## Instrucciones de Uso
+
+### Compilación
+1. Abre una terminal en tu sistema Ubuntu.
+2. Navega al directorio donde se encuentran `server.c` y `client.c`.
+3. Compila el servidor y el cliente utilizando el siguiente comando:
+
+   ```bash
+   gcc server.c -o dhcp_server -lpthread
+   gcc client.c -o dhcp_client
+   ```
+
+### Ejecución del Servidor
+1. Ejecuta el servidor DHCP en la terminal:
+
+   ```bash
+   sudo ./dhcp_server
+   ```
+
+2. Asegúrate de que el servidor esté escuchando las solicitudes en el puerto adecuado (usualmente el puerto 67).
+
+### Ejecución del Cliente
+1. En otra terminal, ejecuta el cliente DHCP:
+
+   ```bash
+   ./dhcp_client
+   ```
+
+2. El cliente enviará una solicitud DHCPDISCOVER y mostrará la dirección IP asignada, máscara de red, puerta de enlace predeterminada y servidor DNS en la consola.
+
+3. Para liberar la dirección IP al finalizar, simplemente cierra el cliente o usa el comando de salida apropiado que hayas implementado.
 
 ## Referencias
 - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/)
@@ -103,6 +137,38 @@ This project implements a DHCP server and client using the C programming languag
 
 ## Conclusions
 This project demonstrates the capability to implement a basic IP allocation service using the DHCP protocol. While several key functionalities were achieved, there are areas for future improvements, such as integrating a DHCP relay and more robust error handling. This implementation can serve as a foundation for a more complex and complete system in the future.
+
+## Usage Instructions
+
+### Compilation
+1. Open a terminal on your Ubuntu system.
+2. Navigate to the directory where `server.c` and `client.c` are located.
+3. Compile the server and client using the following command:
+
+   ```bash
+   gcc server.c -o dhcp_server -lpthread
+   gcc client.c -o dhcp_client
+   ```
+
+### Running the Server
+1. Run the DHCP server in the terminal:
+
+   ```bash
+   sudo ./dhcp_server
+   ```
+
+2. Ensure that the server is listening for requests on the appropriate port (usually port 67).
+
+### Running the Client
+1. In another terminal, run the DHCP client:
+
+   ```bash
+   ./dhcp_client
+   ```
+
+2. The client will send a DHCPDISCOVER request and display the assigned IP address, subnet mask, default gateway, and DNS server on the console.
+
+3. To release the IP address upon termination, simply close the client or use the appropriate exit command you implemented.
 
 ## References
 - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/)
