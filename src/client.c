@@ -10,27 +10,28 @@
 #define DHCP_CLIENT_PORT 68
 #define BUFFER_SIZE 1024
 #define LEASE_TIME 3600 // 1 hour
+#define MAX_RETRIES 5 // Maximum number of retries
+#define RETRY_INTERVAL 2 // Interval between retries in seconds
 
 void request_renewal(int sock, struct sockaddr_in *server_addr) {
-    // Prepare DHCPREQUEST message
     char dhcp_request[BUFFER_SIZE] = "DHCPREQUEST";
-    
+
     // Send DHCPREQUEST message
     sendto(sock, dhcp_request, strlen(dhcp_request), 0, (struct sockaddr *)server_addr, sizeof(*server_addr));
-    
-    // Receive DHCPACK message
+
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
     if (bytes_received > 0) {
         buffer[bytes_received] = '\0'; // Null-terminate the message
         printf("Received: %s\n", buffer); // Display the DHCPACK with IP config
+    } else {
+        printf("No response received for DHCPREQUEST.\n");
     }
 }
 
 void release_ip(int sock, struct sockaddr_in *server_addr) {
-    // Prepare DHCPRELEASE message
     char dhcp_release[BUFFER_SIZE] = "DHCPRELEASE";
-    
+
     // Send DHCPRELEASE message
     sendto(sock, dhcp_release, strlen(dhcp_release), 0, (struct sockaddr *)server_addr, sizeof(*server_addr));
 }
@@ -53,24 +54,38 @@ int main() {
     server_addr.sin_port = htons(DHCP_SERVER_PORT);
     inet_pton(AF_INET, DHCP_SERVER_IP, &server_addr.sin_addr);
 
-    // Send DHCPDISCOVER message
-    ssize_t bytes_sent = sendto(sock, dhcp_discover, strlen(dhcp_discover), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    if (bytes_sent < 0) {
-        perror("sendto failed");
-        close(sock);
-        exit(EXIT_FAILURE);
+    int retries = 0;
+    while (retries < MAX_RETRIES) {
+        // Indicate that the client is attempting to find the server
+        printf("Sending DHCPDISCOVER to %s (Attempt %d of %d)...\n", DHCP_SERVER_IP, retries + 1, MAX_RETRIES);
+        
+        // Send DHCPDISCOVER message
+        ssize_t bytes_sent = sendto(sock, dhcp_discover, strlen(dhcp_discover), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        if (bytes_sent < 0) {
+            perror("sendto failed");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
+
+        // Receive DHCPOFFER message
+        ssize_t bytes_received = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
+        if (bytes_received < 0) {
+            printf("No response received. Retrying in %d seconds...\n", RETRY_INTERVAL);
+            sleep(RETRY_INTERVAL); // Wait before retrying
+            retries++;
+            continue; // Retry sending DHCPDISCOVER
+        }
+
+        buffer[bytes_received] = '\0'; // Null-terminate the message
+        printf("Received: %s\n", buffer); // Print the DHCPOFFER
+        break; // Break the loop on successful reception
     }
 
-    // Receive DHCPOFFER message
-    ssize_t bytes_received = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
-    if (bytes_received < 0) {
-        perror("recvfrom failed");
+    if (retries == MAX_RETRIES) {
+        printf("Failed to receive DHCPOFFER after %d attempts. Exiting...\n", MAX_RETRIES);
         close(sock);
-        exit(EXIT_FAILURE);
+        return 1; // Exit with an error code
     }
-
-    buffer[bytes_received] = '\0'; // Null-terminate the message
-    printf("Received: %s\n", buffer); // Print the DHCPOFFER
 
     // Send DHCPREQUEST to request the offered IP
     request_renewal(sock, &server_addr);

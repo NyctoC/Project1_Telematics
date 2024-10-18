@@ -14,10 +14,24 @@
 #define IP_POOL_SIZE 10
 #define LEASE_TIME 3600 // 1 hour
 
+// Add file pointer for logging
+FILE *log_file;
+
+// Function to log IP assignments and releases
+void log_ip_assignment(const char *ip, const char *client_ip, const char *action) {
+    time_t now = time(NULL);
+    char *time_str = ctime(&now); // Convert time to string
+    time_str[strlen(time_str) - 1] = '\0'; // Remove newline character
+
+    fprintf(log_file, "[%s] %s IP: %s to Client: %s\n", time_str, action, ip, client_ip);
+    fflush(log_file); // Flush the log file to ensure it's written immediately
+}
+
 typedef struct {
-    char ip[16]; // IP address in string format
-    time_t lease_time; // Timestamp of when the lease was granted
-    int is_allocated; // 0 if free, 1 if allocated
+    char ip[16];         // IP address in string format
+    char client_ip[16];  // Client IP in string format (or MAC address if preferred)
+    time_t lease_time;   // Timestamp of when the lease was granted
+    int is_allocated;    // 0 if free, 1 if allocated
 } IpLease;
 
 IpLease ip_pool[IP_POOL_SIZE]; // Array to store IP leases
@@ -56,10 +70,9 @@ void *handle_client(void *arg) {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
-    char offered_ip[16] = "";
 
     while (1) {
-        // Receive DHCP message
+        // Receive DHCPDISCOVER message
         ssize_t bytes_received = recvfrom(sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_len);
         if (bytes_received < 0) {
             perror("recvfrom failed");
@@ -67,47 +80,79 @@ void *handle_client(void *arg) {
         }
 
         buffer[bytes_received] = '\0'; // Null-terminate the message
+        printf("Received: %s from %s\n", buffer, inet_ntoa(client_addr.sin_addr));
 
+        // Check if this is a DHCPDISCOVER or DHCPREQUEST
         if (strcmp(buffer, "DHCPDISCOVER") == 0) {
-            printf("Received DHCPDISCOVER from %s\n", inet_ntoa(client_addr.sin_addr));
-
-            // Try to allocate an IP address
-            if (allocate_ip(offered_ip) == 0) {
-                // Prepare DHCPOFFER message
-                char dhcp_offer[BUFFER_SIZE];
-                snprintf(dhcp_offer, sizeof(dhcp_offer), "DHCPOFFER IP:%s Subnet:255.255.255.0 Gateway:192.168.1.1 DNS:8.8.8.8", offered_ip);
-
-                // Send DHCPOFFER message
-                ssize_t bytes_sent = sendto(sock, dhcp_offer, strlen(dhcp_offer), 0, (struct sockaddr *)&client_addr, client_len);
-                if (bytes_sent < 0) {
-                    perror("sendto failed");
-                } else {
-                    printf("Sent DHCPOFFER to %s with IP %s\n", inet_ntoa(client_addr.sin_addr), offered_ip);
+            // Check if the client already has an assigned IP
+            int assigned_index = -1;
+            for (int i = 0; i < IP_POOL_SIZE; i++) {
+                if (ip_pool[i].is_allocated && strcmp(ip_pool[i].client_ip, inet_ntoa(client_addr.sin_addr)) == 0) {
+                    assigned_index = i; // Client already has an IP assigned
+                    break;
                 }
-            } else {
-                printf("No IP available for %s\n", inet_ntoa(client_addr.sin_addr));
             }
 
-        } else if (strcmp(buffer, "DHCPREQUEST") == 0) {
-            printf("Received DHCPREQUEST from %s\n", inet_ntoa(client_addr.sin_addr));
+            if (assigned_index == -1) {
+                // Assign a new IP
+                for (int i = 0; i < IP_POOL_SIZE; i++) {
+                    if (!ip_pool[i].is_allocated) {
+                        assigned_index = i;
+                        ip_pool[i].is_allocated = 1;
+                        ip_pool[i].lease_time = time(NULL);
+                        strcpy(ip_pool[i].client_ip, inet_ntoa(client_addr.sin_addr));
+                        break;
+                    }
+                }
+            }
 
-            // Prepare DHCPACK message
-            char dhcp_ack[BUFFER_SIZE];
-            snprintf(dhcp_ack, sizeof(dhcp_ack), "DHCPACK IP:%s Subnet:255.255.255.0 Gateway:192.168.1.1 DNS:8.8.8.8 Lease:%d", offered_ip, LEASE_TIME);
+            if (assigned_index == -1) {
+                printf("No available IP addresses\n");
+                continue;
+            }
 
-            // Send DHCPACK message
-            ssize_t bytes_sent = sendto(sock, dhcp_ack, strlen(dhcp_ack), 0, (struct sockaddr *)&client_addr, client_len);
+            // Prepare DHCPOFFER message
+            char dhcp_offer[BUFFER_SIZE];
+            memset(dhcp_offer, 0, sizeof(dhcp_offer));
+            sprintf(dhcp_offer, "DHCPOFFER %s", ip_pool[assigned_index].ip);
+
+            // Send DHCPOFFER message
+            ssize_t bytes_sent = sendto(sock, dhcp_offer, strlen(dhcp_offer), 0, (struct sockaddr *)&client_addr, client_len);
             if (bytes_sent < 0) {
                 perror("sendto failed");
             } else {
-                printf("Sent DHCPACK to %s with IP %s\n", inet_ntoa(client_addr.sin_addr), offered_ip);
+                printf("Sent DHCPOFFER to %s\n", inet_ntoa(client_addr.sin_addr));
+                // Log the IP assignment
+                log_ip_assignment(ip_pool[assigned_index].ip, inet_ntoa(client_addr.sin_addr), "Offered");
             }
 
-        } else if (strcmp(buffer, "DHCPRELEASE") == 0) {
-            printf("Received DHCPRELEASE from %s\n", inet_ntoa(client_addr.sin_addr));
+        } else if (strcmp(buffer, "DHCPREQUEST") == 0) {
+            // Handle DHCPREQUEST and send DHCPACK
+            int assigned_index = -1;
+            for (int i = 0; i < IP_POOL_SIZE; i++) {
+                if (ip_pool[i].is_allocated && strcmp(ip_pool[i].client_ip, inet_ntoa(client_addr.sin_addr)) == 0) {
+                    assigned_index = i; // Client already has an IP assigned
+                    break;
+                }
+            }
 
-            // Release the IP address
-            release_ip(offered_ip);
+            if (assigned_index != -1) {
+                // Prepare DHCPACK message
+                char dhcp_ack[BUFFER_SIZE];
+                memset(dhcp_ack, 0, sizeof(dhcp_ack));
+                sprintf(dhcp_ack, "DHCPACK IP: %s Subnet: 255.255.255.0 Gateway: 192.168.1.1 DNS: 8.8.8.8",
+                        ip_pool[assigned_index].ip);
+
+                // Send DHCPACK message
+                ssize_t bytes_sent = sendto(sock, dhcp_ack, strlen(dhcp_ack), 0, (struct sockaddr *)&client_addr, client_len);
+                if (bytes_sent < 0) {
+                    perror("sendto failed");
+                } else {
+                    printf("Sent DHCPACK to %s\n", inet_ntoa(client_addr.sin_addr));
+                    // Log the IP confirmation
+                    log_ip_assignment(ip_pool[assigned_index].ip, inet_ntoa(client_addr.sin_addr), "Confirmed");
+                }
+            }
         }
     }
 
@@ -117,6 +162,13 @@ void *handle_client(void *arg) {
 
 int main() {
     init_ip_pool();
+
+    // Open log file
+    log_file = fopen("dhcp_server.log", "a");
+    if (log_file == NULL) {
+        perror("Could not open log file");
+        exit(EXIT_FAILURE);
+    }
 
     int sock;
     struct sockaddr_in server_addr;
@@ -151,5 +203,6 @@ int main() {
         sleep(1);
     }
 
+    fclose(log_file); // Close the log file when done
     return 0;
 }
