@@ -4,61 +4,40 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <signal.h>
 
 #define DHCP_SERVER_IP "10.0.2.5"
 #define DHCP_SERVER_PORT 67
 #define DHCP_CLIENT_PORT 68
 #define BUFFER_SIZE 1024
+#define IP_POOL_SIZE 10
 #define LEASE_TIME 3600 // 1 hour
 
-int sock;
-struct sockaddr_in server_addr;
-
-// Function to parse server response and display IP details
-void parse_and_display_info(char *buffer) {
-    char ip[16], subnet_mask[16], gateway[16], dns[16];
-    // Assuming the server sends a CSV-like response with IP, subnet, gateway, DNS
-    sscanf(buffer, "%s %s %s %s", ip, subnet_mask, gateway, dns);
-    
-    printf("Received DHCP Offer:\n");
-    printf("IP Address: %s\n", ip);
-    printf("Subnet Mask: %s\n", subnet_mask);
-    printf("Default Gateway: %s\n", gateway);
-    printf("DNS Server: %s\n", dns);
-}
-
-// Function to send a DHCPREQUEST for IP renewal
-void request_renewal() {
-    // Prepare DHCPREQUEST message
+void request_renewal(int sock, struct sockaddr_in *server_addr) {
+    // Prepare DHCPREQUEST message (simplified)
     char dhcp_request[BUFFER_SIZE];
     strcpy(dhcp_request, "DHCPREQUEST");
     
     // Send DHCPREQUEST message
-    sendto(sock, dhcp_request, strlen(dhcp_request), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    sendto(sock, dhcp_request, strlen(dhcp_request), 0, (struct sockaddr *)server_addr, sizeof(*server_addr));
     
     // Receive DHCPACK message
     char buffer[BUFFER_SIZE];
     recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
-    printf("Received on renewal: %s\n", buffer);
-    parse_and_display_info(buffer); // Display the updated IP details
+    printf("Received: %s\n", buffer);
 }
 
-// Function to send a DHCPRELEASE message before exiting
-void release_ip() {
-    // Prepare DHCPRELEASE message
+void release_ip(int sock, struct sockaddr_in *server_addr) {
+    // Prepare DHCPRELEASE message (simplified)
     char dhcp_release[BUFFER_SIZE];
     strcpy(dhcp_release, "DHCPRELEASE");
     
     // Send DHCPRELEASE message
-    sendto(sock, dhcp_release, strlen(dhcp_release), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    printf("IP released\n");
-    close(sock);
-    exit(0);
+    sendto(sock, dhcp_release, strlen(dhcp_release), 0, (struct sockaddr *)server_addr, sizeof(*server_addr));
 }
 
 int main() {
-    struct sockaddr_in client_addr;
+    int sock;
+    struct sockaddr_in server_addr;
     char dhcp_discover[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
 
@@ -74,19 +53,7 @@ int main() {
     server_addr.sin_port = htons(DHCP_SERVER_PORT);
     inet_pton(AF_INET, DHCP_SERVER_IP, &server_addr.sin_addr);
 
-    // Bind the socket to DHCP client port
-    memset(&client_addr, 0, sizeof(client_addr));
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = INADDR_ANY;
-    client_addr.sin_port = htons(DHCP_CLIENT_PORT);
-
-    if (bind(sock, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-        perror("Bind failed");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-
-    // Prepare DHCPDISCOVER message
+    // Prepare DHCPDISCOVER message (simplified)
     strcpy(dhcp_discover, "DHCPDISCOVER");
 
     // Send DHCPDISCOVER message
@@ -105,17 +72,17 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Print received IP and other details
-    parse_and_display_info(buffer);
+    // Print received DHCPOFFER
+    printf("Received: %s\n", buffer);
 
-    // Handle renewal when needed
+    // Check for renewal condition
     while (1) {
-        sleep(LEASE_TIME / 2); // Request renewal halfway through lease time
-        request_renewal();
+        sleep(LEASE_TIME / 2); // Example: request renewal halfway through the lease time
+        request_renewal(sock, &server_addr);
     }
 
-    // Register signal handler to release IP on exit
-    signal(SIGINT, release_ip);
-
+    // Release IP before exit
+    release_ip(sock, &server_addr);
+    close(sock);
     return 0;
 }
